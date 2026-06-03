@@ -109,10 +109,10 @@ body{font-family:'Nunito',sans-serif;background:var(--cream);color:var(--text);p
 </div>
 
 <script>
-// आपका नया लाइव डेटाबेस URL यहाँ ऑटो-कॉन्फ़िगर कर दिया गया है:
 const FIREBASE_DB_URL = "https://digital-tracker-acf68-default-rtdb.firebaseio.com";
 
 let CACHED_TIMELINE = {}; let CACHED_PRODUCTS = []; let CACHED_DATES = {};
+let SERVER_SORTED_MONTHS = []; // स्टोर करेगा कि डेटाबेस में कौन-कौन से महीने एक्टिव हैं
 const monthsOrder = ['april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december', 'january', 'february', 'march'];
 
 async function initDashboard(){
@@ -132,15 +132,16 @@ async function initDashboard(){
     CACHED_TIMELINE = tRes; CACHED_PRODUCTS = pRes || []; CACHED_DATES = dRes || {};
     document.getElementById('liveTickerContainer').textContent = tickerRes || "Operational.";
     
-    const activeMonths = Object.keys(CACHED_TIMELINE).sort((a,b) => monthsOrder.indexOf(a) - monthsOrder.indexOf(b));
+    SERVER_SORTED_MONTHS = Object.keys(CACHED_TIMELINE).sort((a,b) => monthsOrder.indexOf(a) - monthsOrder.indexOf(b));
+    
     const mSel = document.getElementById('umonthSelect');
-    mSel.innerHTML = activeMonths.map(m=>`<option value="${m}">${m.toUpperCase()}</option>`).join('');
-    mSel.value = activeMonths[activeMonths.length-1];
+    mSel.innerHTML = SERVER_SORTED_MONTHS.map(m=>`<option value="${m}">${m.toUpperCase()}</option>`).join('');
+    mSel.value = SERVER_SORTED_MONTHS[SERVER_SORTED_MONTHS.length-1]; // डिफ़ॉल्ट रूप से सबसे आखिरी महीना (June)
 
     document.getElementById('leaderboardProductFilter').innerHTML = CACHED_PRODUCTS.map(p=>`<option value="${p.id}">${p.icon} ${p.name}</option>`).join('');
 
     const uniqueBranches = new Map();
-    activeMonths.forEach(m => {
+    SERVER_SORTED_MONTHS.forEach(m => {
       (CACHED_TIMELINE[m] || []).forEach(row => {
         const alpha = row['Alpha Code']; const name = row['Branch Name'];
         if(alpha) uniqueBranches.set(alpha.trim(), name ? name.trim() : alpha.trim());
@@ -158,7 +159,18 @@ async function initDashboard(){
 
 function handleViewModeChange() {
   const viewMode = document.getElementById('umetricViewSelect').value;
-  document.getElementById('monthDropdownWrapper').style.display = (viewMode === 'MTD') ? 'block' : 'none';
+  const mSel = document.getElementById('umonthSelect');
+  
+  if (viewMode === 'YTD') {
+    // [FIX] जब यूजर वापस YTD में आएगा, तो कोड आटोमेटिकली सबसे लेटेस्ट उपलब्ध महीने (June) पर रिसेट हो जाएगा
+    document.getElementById('monthDropdownWrapper').style.display = 'none';
+    if(SERVER_SORTED_MONTHS.length > 0) {
+       mSel.value = SERVER_SORTED_MONTHS[SERVER_SORTED_MONTHS.length - 1]; 
+    }
+  } else {
+    // MTD व्यू में ड्रॉपडाउन दिखेगा ताकि यूजर पुराना महीना चुन सके
+    document.getElementById('monthDropdownWrapper').style.display = 'block';
+  }
   syncDashboard();
 }
 
